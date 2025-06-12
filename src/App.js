@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import jsPDF from "jspdf";
+import htmlDocx from "html-docx-js";
 
 const riskRecTemplates = {
   "Fall from heights": "Ensure that all elevated work areas are secured with proper fall protection measures such as guardrails, personal fall arrest systems, or designated tie-off points. Workers should be trained on hazard awareness and equipment use.",
@@ -172,6 +174,32 @@ The information contained in this report is based on verbal responses, visual ob
     setReport(output);
   };
 
+  const downloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFont("Courier", "normal");
+    const lines = report.split("\n");
+    let y = 10;
+    lines.forEach((line) => {
+      doc.text(line, 10, y);
+      y += 7;
+      if (y > 280) {
+        doc.addPage();
+        y = 10;
+      }
+    });
+    doc.save("Engagement_Confirmation_Summary.pdf");
+  };
+
+  const downloadDocx = () => {
+    const converted = htmlDocx.asBlob(`<pre>${report}</pre>`);
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(converted);
+    link.download = "Engagement_Confirmation_Summary.docx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div style={{ padding: "30px", fontFamily: "monospace" }}>
       <img src="/peril-logo.png" alt="Peril Mavens Logo" style={{ width: "180px", marginBottom: "20px" }} />
@@ -180,7 +208,16 @@ The information contained in this report is based on verbal responses, visual ob
       <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "700px" }}>
         <input name="project" placeholder="Project Name" onChange={handleChange} />
         <input name="location" placeholder="Location" onChange={handleChange} />
-        <input name="date" placeholder="Date of Visit" onChange={handleChange} />
+        <label>
+          Date of Visit:
+          <input
+            type="date"
+            name="date"
+            value={form.date}
+            onChange={handleChange}
+            style={{ width: "100%", marginTop: "5px" }}
+          />
+        </label>
         <input name="consultant" placeholder="Consultant Name" onChange={handleChange} />
         <input name="contact" placeholder="Onsite Contact" onChange={handleChange} />
         <textarea name="objective" placeholder="Visit Objective" rows={3} onChange={handleChange} />
@@ -266,17 +303,24 @@ The information contained in this report is based on verbal responses, visual ob
       </div>
 
       {report && (
-        <pre
-          style={{
-            marginTop: "30px",
-            background: "#f0f0f0",
-            padding: "15px",
-            whiteSpace: "pre-wrap",
-            overflowX: "auto",
-          }}
-        >
-          {report}
-        </pre>
+        <>
+          <pre
+            style={{
+              marginTop: "30px",
+              background: "#f0f0f0",
+              padding: "15px",
+              whiteSpace: "pre-wrap",
+              overflowX: "auto",
+            }}
+          >
+            {report}
+          </pre>
+
+          <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+            <button onClick={downloadPDF}>📄 Download as PDF</button>
+            <button onClick={downloadDocx}>📝 Download as Word</button>
+          </div>
+        </>
       )}
     </div>
   );
