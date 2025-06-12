@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import jsPDF from "jspdf";
-import htmlDocx from "html-docx-js";
+import htmlToDocx from "html-to-docx";
 
 const riskRecTemplates = {
   "Fall from heights": "Ensure that all elevated work areas are secured with proper fall protection measures such as guardrails, personal fall arrest systems, or designated tie-off points. Workers should be trained on hazard awareness and equipment use.",
@@ -190,10 +190,16 @@ The information contained in this report is based on verbal responses, visual ob
     doc.save("Engagement_Confirmation_Summary.pdf");
   };
 
-  const downloadDocx = () => {
-    const converted = htmlDocx.asBlob(`<pre>${report}</pre>`);
+  const downloadDocx = async () => {
+    const content = `<pre>${report}</pre>`;
+    const blob = await htmlToDocx(content, null, {
+      orientation: "portrait",
+      pxPerInch: 96,
+      margins: { top: 720, right: 720, bottom: 720, left: 720 },
+    });
+
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(converted);
+    link.href = URL.createObjectURL(blob);
     link.download = "Engagement_Confirmation_Summary.docx";
     document.body.appendChild(link);
     link.click();
