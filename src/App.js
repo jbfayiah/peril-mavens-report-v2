@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import jsPDF from "jspdf";
-import { Document, Packer, Paragraph } from "docx";
+import { Document, Packer, Paragraph, Media } from "docx";
 import { saveAs } from "file-saver";
 
 const riskRecTemplates = {
@@ -186,12 +186,24 @@ The information contained in this report is based on verbal responses, visual ob
   };
 
   const downloadDocx = async () => {
+    const children = report.split("\n").map(line => new Paragraph(line));
+
+    for (const photo of photos) {
+      const base64 = await fileToBase64(photo);
+      children.push(new Paragraph(`General Photo: ${photo.name}`));
+      children.push(Media.addImage(new Document(), base64));
+    }
+
+    for (let i = 0; i < recommendations.length; i++) {
+      for (const photo of recommendations[i].recPhotos) {
+        const base64 = await fileToBase64(photo);
+        children.push(new Paragraph(`Rec #${i + 1} Photo: ${photo.name}`));
+        children.push(Media.addImage(new Document(), base64));
+      }
+    }
+
     const doc = new Document({
-      sections: [
-        {
-          children: report.split("\n").map(line => new Paragraph(line))
-        }
-      ]
+      sections: [{ children }]
     });
 
     const blob = await Packer.toBlob(doc);
@@ -273,6 +285,41 @@ The information contained in this report is based on verbal responses, visual ob
       {report && (
         <>
           <pre style={{ background: "#f0f0f0", padding: 15, marginTop: 30, whiteSpace: "pre-wrap" }}>{report}</pre>
+
+          {photos.length > 0 && (
+            <div>
+              <h4>📸 General Photo Previews</h4>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {photos.map((file, idx) => (
+                  <img
+                    key={idx}
+                    src={URL.createObjectURL(file)}
+                    alt={`Photo ${idx + 1}`}
+                    style={{ width: 100, height: 75, objectFit: "cover", border: "1px solid #ccc" }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {recommendations.map((r, i) =>
+            r.recPhotos.length > 0 ? (
+              <div key={`rec-${i}`} style={{ marginTop: 20 }}>
+                <h4>🛠️ Rec #{i + 1} Photo Previews</h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {r.recPhotos.map((file, j) => (
+                    <img
+                      key={`rec-${i}-img-${j}`}
+                      src={URL.createObjectURL(file)}
+                      alt={`Rec ${i + 1} - Photo ${j + 1}`}
+                      style={{ width: 100, height: 75, objectFit: "cover", border: "1px solid #ccc" }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null
+          )}
+
           <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
             <button onClick={downloadPDF}>📄 Download as PDF</button>
             <button onClick={downloadDocx}>📝 Download as Word</button>
@@ -284,4 +331,5 @@ The information contained in this report is based on verbal responses, visual ob
 }
 
 export default App;
+
 
