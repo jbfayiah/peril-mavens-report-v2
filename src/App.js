@@ -1,125 +1,82 @@
 import React, { useState } from "react";
 import jsPDF from "jspdf";
-import htmlToDocx from "html-to-docx";
+import { Document, Packer, Paragraph } from "docx";
+import { saveAs } from "file-saver";
 
 const riskRecTemplates = {
-  "Fall from heights": "Ensure that all elevated work areas are secured with proper fall protection measures such as guardrails, personal fall arrest systems, or designated tie-off points. Workers should be trained on hazard awareness and equipment use.",
-  "Fall at same level": "Maintain clear, dry, and well-lit walking surfaces to prevent slips and trips. Ensure all walkways are free from clutter and transition areas are marked clearly.",
-  "Material Handling": "Encourage the use of proper lifting techniques and mechanical aids to reduce strain. Ensure that handling paths are free of obstructions and storage is stable and accessible.",
-  "Housekeeping": "Implement a regular housekeeping schedule to keep work areas clean, organized, and free of hazards such as debris, tools, and spills. Assign responsibility to designated personnel.",
-  "Electrical": "All energized equipment should be properly labeled, and access restricted to qualified individuals. Inspect cords, panels, and outlets regularly for wear or damage.",
-  "Struck-by": "Identify zones with potential for overhead or moving object hazards and implement controls like barricades, PPE, and visual alerts. Ensure operators and ground personnel maintain clear communication.",
-  "Caught-in-between": "Verify that moving equipment, machinery, and pinch points are properly guarded. Establish protocols to prevent workers from entering confined or moving part zones during operations.",
-  "Pinch-point": "Identify and label pinch hazard locations on tools, doors, and machinery. Reinforce safe hand positioning practices and the use of guards or barriers.",
-  "Public Protection": "Restrict unauthorized public access to active work areas with barriers and clear signage. Ensure any work near pedestrian zones includes visibility controls and site monitoring.",
-  "Other": "",
+  "Fall from heights": "Ensure proper fall protection such as guardrails, harnesses, and training is in place when working above ground level.",
+  "Fall at same level": "Maintain clean walking surfaces, mark transitions clearly, and use slip-resistant materials to prevent same-level falls.",
+  "Material Handling": "Use proper lifting techniques and ensure materials are stacked securely and accessibly.",
+  "Housekeeping": "Implement daily cleanup routines to remove clutter, debris, and tripping hazards.",
+  "Electrical": "Ensure energized equipment is labeled, inspected regularly, and only accessed by qualified personnel.",
+  "Struck-by": "Use barricades, PPE, and visible alerts in areas with moving equipment or overhead hazards.",
+  "Caught-in-between": "Ensure moving machinery is guarded and workers are trained on staying clear of pinch zones.",
+  "Pinch-point": "Identify pinch hazards and use signage and guards to prevent injuries.",
+  "Public Protection": "Install barriers and signage to separate the public from active work zones.",
+  "Other": ""
 };
 
 function App() {
   const [form, setForm] = useState({
-    project: "",
-    location: "",
-    date: "",
-    contact: "",
-    consultant: "",
-    objective: "",
-    takeaways: "",
-    planning: "",
-    conclusion: "",
+    project: "", location: "", date: "", consultant: "", contact: "",
+    objective: "", takeaways: "", planning: "", conclusion: ""
   });
 
   const [photos, setPhotos] = useState([]);
   const [recommendations, setRecommendations] = useState([
-    {
-      party: "",
-      severity: "",
-      area: "",
-      areaDescription: "",
-      recommendation: "",
-      recPhotos: [],
-    },
+    { party: "", severity: "", area: "", areaDescription: "", recommendation: "", recPhotos: [] }
   ]);
 
   const [report, setReport] = useState("");
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handlePhotoUpload = (e) => {
     const files = Array.from(e.target.files);
-    setPhotos(files.map((file) => file.name));
-  };
-
-  const handleRecommendationChange = (index, e) => {
-    const updated = [...recommendations];
-    const { name, value } = e.target;
-
-    if (name === "area") {
-      updated[index].area = value;
-      if (value !== "Other") {
-        updated[index].recommendation = riskRecTemplates[value] || "";
-        updated[index].areaDescription = "";
-      } else {
-        updated[index].recommendation = "";
-      }
-    } else {
-      updated[index][name] = value;
-    }
-
-    setRecommendations(updated);
+    setPhotos(files.map(f => f.name));
   };
 
   const handleRecPhotoUpload = (index, e) => {
     const files = Array.from(e.target.files);
     const updated = [...recommendations];
-    updated[index].recPhotos = files.map((file) => file.name);
+    updated[index].recPhotos = files.map(f => f.name);
+    setRecommendations(updated);
+  };
+
+  const handleRecommendationChange = (i, e) => {
+    const { name, value } = e.target;
+    const updated = [...recommendations];
+    if (name === "area") {
+      updated[i].area = value;
+      updated[i].recommendation = riskRecTemplates[value] || "";
+      updated[i].areaDescription = "";
+    } else {
+      updated[i][name] = value;
+    }
     setRecommendations(updated);
   };
 
   const addRecommendation = () => {
     setRecommendations([
       ...recommendations,
-      {
-        party: "",
-        severity: "",
-        area: "",
-        areaDescription: "",
-        recommendation: "",
-        recPhotos: [],
-      },
+      { party: "", severity: "", area: "", areaDescription: "", recommendation: "", recPhotos: [] }
     ]);
   };
 
   const generateReport = () => {
-    const photoList = photos.length
-      ? photos.map((p) => `  - ${p}`).join("\n")
-      : "  None provided";
+    const photoList = photos.length > 0 ? photos.map(p => `  - ${p}`).join("\n") : "  None provided";
 
-    const tableHeader = `| Responsible Party | Severity | Area of Risk | Recommendation |
-|-------------------|----------|--------------|----------------|`;
+    const table = recommendations.map((r, i) => {
+      const area = r.area === "Other" ? `Other - ${r.areaDescription}` : r.area;
+      return `| ${r.party || "N/A"} | ${r.severity || "N/A"} | ${area || "N/A"} | ${r.recommendation || "N/A"} |`;
+    }).join("\n");
 
-    const tableRows = recommendations
-      .map((rec) => {
-        const riskArea =
-          rec.area === "Other" && rec.areaDescription
-            ? `Other - ${rec.areaDescription}`
-            : rec.area || "N/A";
+    const recPhotos = recommendations.map((r, i) => {
+      const list = r.recPhotos.length > 0 ? r.recPhotos.map(p => `  - ${p}`).join("\n") : "  None submitted";
+      return `Recommendation #${i + 1} Photos:\n${list}`;
+    }).join("\n\n");
 
-        return `| ${rec.party || "N/A"} | ${rec.severity || "N/A"} | ${riskArea} | ${rec.recommendation || "N/A"} |`;
-      })
-      .join("\n");
-
-    const recPhotosSection = recommendations
-      .map((rec, i) => {
-        const recPhotoText = rec.recPhotos.length
-          ? rec.recPhotos.map((p) => `  - ${p}`).join("\n")
-          : "  None submitted";
-        return `Recommendation #${i + 1} Photos:\n${recPhotoText}`;
-      })
-      .join("\n\n");
-
-    const output = `
+    const summary = `
 +--------------------------------------------------------------+
 |             ENGAGEMENT CONFIRMATION SUMMARY                 |
 +--------------------------------------------------------------+
@@ -155,23 +112,22 @@ ${photoList}
 
 --------------------------------------------------------------
 RECOMMENDATIONS:
-
-${tableHeader}
-${tableRows}
+| Responsible Party | Severity | Area of Risk | Recommendation |
+|-------------------|----------|--------------|----------------|
+${table}
 
 --------------------------------------------------------------
 ATTACHED PHOTOS FOR RECOMMENDATIONS:
 
-${recPhotosSection}
+${recPhotos}
 
 --------------------------------------------------------------
 DISCLAIMER:
-
 The information contained in this report is based on verbal responses, visual observations, and available documentation at the time of the visit. This report is provided solely for informational and advisory purposes to support risk awareness and operational improvement. It does not constitute legal advice, regulatory enforcement, or a compliance determination on behalf of any governmental agency. Peril Mavens is an independent consulting firm and does not represent OSHA or any regulatory authority. All recommendations are provided in good faith and based on professional judgment, but final decisions regarding implementation remain the responsibility of the client.
 
-+--------------------------------------------------------------+
-    `;
-    setReport(output);
++--------------------------------------------------------------+`;
+
+    setReport(summary);
   };
 
   const downloadPDF = () => {
@@ -191,138 +147,94 @@ The information contained in this report is based on verbal responses, visual ob
   };
 
   const downloadDocx = async () => {
-    const content = `<pre>${report}</pre>`;
-    const blob = await htmlToDocx(content, null, {
-      orientation: "portrait",
-      pxPerInch: 96,
-      margins: { top: 720, right: 720, bottom: 720, left: 720 },
+    const doc = new Document({
+      sections: [
+        {
+          children: [new Paragraph(report)]
+        }
+      ]
     });
 
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "Engagement_Confirmation_Summary.docx";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, "Engagement_Confirmation_Summary.docx");
   };
 
   return (
-    <div style={{ padding: "30px", fontFamily: "monospace" }}>
-      <img src="/peril-logo.png" alt="Peril Mavens Logo" style={{ width: "180px", marginBottom: "20px" }} />
+    <div style={{ padding: 30, fontFamily: "monospace", maxWidth: 700 }}>
       <h2>Engagement Confirmation Summary Generator</h2>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "700px" }}>
-        <input name="project" placeholder="Project Name" onChange={handleChange} />
-        <input name="location" placeholder="Location" onChange={handleChange} />
-        <label>
-          Date of Visit:
-          <input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={handleChange}
-            style={{ width: "100%", marginTop: "5px" }}
-          />
-        </label>
-        <input name="consultant" placeholder="Consultant Name" onChange={handleChange} />
-        <input name="contact" placeholder="Onsite Contact" onChange={handleChange} />
-        <textarea name="objective" placeholder="Visit Objective" rows={3} onChange={handleChange} />
-        <textarea name="takeaways" placeholder="High-Level Takeaways" rows={3} onChange={handleChange} />
-        <textarea name="planning" placeholder="Planning Ahead" rows={3} onChange={handleChange} />
-        <textarea name="conclusion" placeholder="Conclusion" rows={3} onChange={handleChange} />
+      {["project", "location", "consultant", "contact"].map(field => (
+        <input
+          key={field}
+          name={field}
+          placeholder={field.replace(/\\b\\w/g, l => l.toUpperCase())}
+          onChange={handleChange}
+          style={{ marginBottom: 10, width: "100%" }}
+        />
+      ))}
+      <label>
+        Date of Visit:
+        <input type="date" name="date" onChange={handleChange} style={{ display: "block", marginBottom: 10, width: "100%" }} />
+      </label>
+      {["objective", "takeaways", "planning", "conclusion"].map(field => (
+        <textarea
+          key={field}
+          name={field}
+          placeholder={field.replace(/\\b\\w/g, l => l.toUpperCase())}
+          rows={3}
+          onChange={handleChange}
+          style={{ marginBottom: 10, width: "100%" }}
+        />
+      ))}
+      <label>
+        Upload General Photos:
+        <input type="file" multiple onChange={handlePhotoUpload} style={{ display: "block", marginBottom: 20 }} />
+      </label>
 
-        <label>
-          Upload General Photos:
-          <input type="file" multiple onChange={handlePhotoUpload} />
-        </label>
-
-        <h3 style={{ marginTop: "20px" }}>Recommendations</h3>
-        {recommendations.map((rec, index) => (
-          <div key={index} style={{ border: "1px solid #ccc", padding: "10px", marginBottom: "10px" }}>
+      <h3>Recommendations</h3>
+      {recommendations.map((r, i) => (
+        <div key={i} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 10 }}>
+          <input name="party" placeholder="Responsible Party" value={r.party} onChange={e => handleRecommendationChange(i, e)} style={{ width: "100%", marginBottom: 5 }} />
+          <select name="severity" value={r.severity} onChange={e => handleRecommendationChange(i, e)} style={{ width: "100%", marginBottom: 5 }}>
+            <option value="">Select Severity</option>
+            <option value="Low">Low</option><option value="Medium">Medium</option>
+            <option value="High">High</option><option value="IDLH">IDLH</option>
+          </select>
+          <select name="area" value={r.area} onChange={e => handleRecommendationChange(i, e)} style={{ width: "100%", marginBottom: 5 }}>
+            <option value="">Select Area of Risk</option>
+            {Object.keys(riskRecTemplates).map(key => <option key={key} value={key}>{key}</option>)}
+          </select>
+          {r.area === "Other" && (
             <input
-              name="party"
-              placeholder="Responsible Party"
-              value={rec.party}
-              onChange={(e) => handleRecommendationChange(index, e)}
-              style={{ marginBottom: "5px", width: "100%" }}
+              name="areaDescription"
+              placeholder="Describe Other Area"
+              value={r.areaDescription}
+              onChange={e => handleRecommendationChange(i, e)}
+              style={{ width: "100%", marginBottom: 5 }}
             />
-            <select
-              name="severity"
-              value={rec.severity}
-              onChange={(e) => handleRecommendationChange(index, e)}
-              style={{ marginBottom: "5px", width: "100%" }}
-            >
-              <option value="">Select Severity</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="IDLH">IDLH (Immediately Dangerous to Life and Health)</option>
-            </select>
-            <select
-              name="area"
-              value={rec.area}
-              onChange={(e) => handleRecommendationChange(index, e)}
-              style={{ marginBottom: "5px", width: "100%" }}
-            >
-              <option value="">Select Area of Risk</option>
-              {Object.keys(riskRecTemplates).map((area) => (
-                <option key={area} value={area}>{area}</option>
-              ))}
-            </select>
-            {rec.area === "Other" && (
-              <input
-                name="areaDescription"
-                placeholder="Describe other area of risk"
-                value={rec.areaDescription}
-                onChange={(e) => handleRecommendationChange(index, e)}
-                style={{ marginBottom: "5px", width: "100%" }}
-              />
-            )}
-            <textarea
-              name="recommendation"
-              placeholder="Recommendation Narrative"
-              value={rec.recommendation}
-              onChange={(e) => handleRecommendationChange(index, e)}
-              rows={2}
-              style={{ width: "100%", marginBottom: "5px" }}
-            />
-            <label>
-              Attach Photos for This Recommendation:
-              <input
-                type="file"
-                multiple
-                onChange={(e) => handleRecPhotoUpload(index, e)}
-                style={{ display: "block", marginTop: "5px" }}
-              />
-            </label>
-          </div>
-        ))}
-        <button onClick={addRecommendation} style={{ width: "fit-content", marginBottom: "20px" }}>
-          + Add Another Recommendation
-        </button>
-        <button
-          style={{ marginTop: "10px", padding: "10px", background: "#000", color: "#fff", border: "none" }}
-          onClick={generateReport}
-        >
-          Generate Summary
-        </button>
-      </div>
+          )}
+          <textarea
+            name="recommendation"
+            placeholder="Recommendation"
+            value={r.recommendation}
+            onChange={e => handleRecommendationChange(i, e)}
+            rows={2}
+            style={{ width: "100%", marginBottom: 5 }}
+          />
+          <label>
+            Attach Photos:
+            <input type="file" multiple onChange={e => handleRecPhotoUpload(i, e)} style={{ display: "block", marginTop: 5 }} />
+          </label>
+        </div>
+      ))}
+      <button onClick={addRecommendation}>+ Add Another Recommendation</button>
+
+      <button onClick={generateReport} style={{ marginTop: 20 }}>Generate Summary</button>
 
       {report && (
         <>
-          <pre
-            style={{
-              marginTop: "30px",
-              background: "#f0f0f0",
-              padding: "15px",
-              whiteSpace: "pre-wrap",
-              overflowX: "auto",
-            }}
-          >
-            {report}
-          </pre>
-
-          <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+          <pre style={{ background: "#f0f0f0", padding: 15, marginTop: 30, whiteSpace: "pre-wrap" }}>{report}</pre>
+          <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
             <button onClick={downloadPDF}>📄 Download as PDF</button>
             <button onClick={downloadDocx}>📝 Download as Word</button>
           </div>
