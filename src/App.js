@@ -33,13 +33,13 @@ function App() {
 
   const handlePhotoUpload = (e) => {
     const files = Array.from(e.target.files);
-    setPhotos(files.map(f => f.name));
+    setPhotos(files);
   };
 
   const handleRecPhotoUpload = (index, e) => {
     const files = Array.from(e.target.files);
     const updated = [...recommendations];
-    updated[index].recPhotos = files.map(f => f.name);
+    updated[index].recPhotos = files;
     setRecommendations(updated);
   };
 
@@ -63,8 +63,27 @@ function App() {
     ]);
   };
 
+  const validateForm = () => {
+    const required = ["project", "location", "date", "consultant", "contact"];
+    return required.every(f => form[f].trim() !== "");
+  };
+
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const generateReport = () => {
-    const photoList = photos.length > 0 ? photos.map(p => `  - ${p}`).join("\n") : "  None provided";
+    if (!validateForm()) {
+      alert("Please fill out all required fields before generating the summary.");
+      return;
+    }
+
+    const photoList = photos.length > 0 ? photos.map(f => `  - ${f.name}`).join("\n") : "  None provided";
 
     const table = recommendations.map((r, i) => {
       const area = r.area === "Other" ? `Other - ${r.areaDescription}` : r.area;
@@ -72,7 +91,7 @@ function App() {
     }).join("\n");
 
     const recPhotos = recommendations.map((r, i) => {
-      const list = r.recPhotos.length > 0 ? r.recPhotos.map(p => `  - ${p}`).join("\n") : "  None submitted";
+      const list = r.recPhotos.length > 0 ? r.recPhotos.map(p => `  - ${p.name}`).join("\n") : "  None submitted";
       return `Recommendation #${i + 1} Photos:\n${list}`;
     }).join("\n\n");
 
@@ -130,19 +149,39 @@ The information contained in this report is based on verbal responses, visual ob
     setReport(summary);
   };
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     const doc = new jsPDF();
     doc.setFont("Courier", "normal");
     const lines = report.split("\n");
     let y = 10;
     lines.forEach((line) => {
-      doc.text(line, 10, y);
-      y += 7;
-      if (y > 280) {
-        doc.addPage();
-        y = 10;
-      }
+      const split = doc.splitTextToSize(line, 180);
+      split.forEach(l => {
+        doc.text(l, 10, y);
+        y += 7;
+        if (y > 280) {
+          doc.addPage();
+          y = 10;
+        }
+      });
     });
+
+    for (const photo of photos) {
+      const base64 = await fileToBase64(photo);
+      doc.addPage();
+      doc.text(`General Photo: ${photo.name}`, 10, 10);
+      doc.addImage(base64, 'JPEG', 10, 20, 100, 75);
+    }
+
+    for (let i = 0; i < recommendations.length; i++) {
+      for (const photo of recommendations[i].recPhotos) {
+        const base64 = await fileToBase64(photo);
+        doc.addPage();
+        doc.text(`Rec #${i + 1} Photo: ${photo.name}`, 10, 10);
+        doc.addImage(base64, 'JPEG', 10, 20, 100, 75);
+      }
+    }
+
     doc.save("Engagement_Confirmation_Summary.pdf");
   };
 
@@ -150,7 +189,7 @@ The information contained in this report is based on verbal responses, visual ob
     const doc = new Document({
       sections: [
         {
-          children: [new Paragraph(report)]
+          children: report.split("\n").map(line => new Paragraph(line))
         }
       ]
     });
@@ -167,7 +206,7 @@ The information contained in this report is based on verbal responses, visual ob
         <input
           key={field}
           name={field}
-          placeholder={field.replace(/\\b\\w/g, l => l.toUpperCase())}
+          placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
           onChange={handleChange}
           style={{ marginBottom: 10, width: "100%" }}
         />
@@ -180,7 +219,7 @@ The information contained in this report is based on verbal responses, visual ob
         <textarea
           key={field}
           name={field}
-          placeholder={field.replace(/\\b\\w/g, l => l.toUpperCase())}
+          placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
           rows={3}
           onChange={handleChange}
           style={{ marginBottom: 10, width: "100%" }}
@@ -245,3 +284,4 @@ The information contained in this report is based on verbal responses, visual ob
 }
 
 export default App;
+
